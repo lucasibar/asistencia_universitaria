@@ -21,7 +21,7 @@ async function backend(page: Page, role = 'ADMIN') {
   await page.route('http://127.0.0.1:3000/**', async route => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = {};
-    if (path === '/me') data = { id: userId, name: 'Lucas Ibar', email: 'lucas@example.com', role };
+    if (path === '/me') data = { id: userId, name: 'Lucas Ibar', email: 'lucas@example.com', role, academic_first_name: 'Lucas', academic_last_name: 'Ibar' };
     else if (path === '/courses') data = courses;
     else if (path === `/courses/${courseId}/classes`) data = [{ id: 'class-1', name: 'Clase 14', class_date: new Date().toISOString(), session_id: sessionId, session_status: 'OPEN', present_count: 1, archived_at: null }];
     else if (path === `/attendance-sessions/${sessionId}`) data = { id: sessionId, course_id: courseId, class_id: 'class-1', class_name: 'Clase 14', course_name: 'Coaching N1', effective_status: closed ? 'CLOSED' : 'OPEN', started_at: new Date().toISOString(), expires_at: new Date(Date.now() + 300000).toISOString(), server_time: new Date().toISOString(), present_count: 1 };
@@ -50,6 +50,7 @@ test('teacher views courses, searches and creates a session once', async ({ page
   await page.getByRole('textbox', { name: 'Buscar curso' }).fill('Avanzado');
   await expect(page.getByRole('heading', { name: 'Coaching Avanzado' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Coaching N1', exact: true })).toHaveCount(0);
+  await page.goto(`/cursos/${courseId}`);
   await page.getByRole('button', { name: 'Tomar asistencia' }).click();
   await page.getByRole('button', { name: 'Generar QR' }).click();
   await expect(page).toHaveURL(`/sesiones/${sessionId}`);
@@ -127,6 +128,43 @@ test('archiving history requires explicit second confirmation', async ({ page })
 });
 test('student cannot see the teacher dashboard', async ({ page }) => {
   await auth(page); await backend(page, 'STUDENT'); await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Todo empieza con un QR.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Creá tu cuenta de profesor.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Tomar asistencia' })).toHaveCount(0);
+});
+
+test('new teacher explicitly registers and reaches own courses', async ({ page }) => {
+  await auth(page); await backend(page, 'STUDENT');
+  let registered = false;
+  await page.route('**/me', route => route.fulfill({ json: { id: userId, name: 'Lucas Ibar', email: 'lucas@example.com', role: registered ? 'ADMIN' : 'STUDENT' } }));
+  await page.route('**/me/teacher', route => { registered = true; return route.fulfill({ json: { id: userId, name: 'Lucas Ibar', email: 'lucas@example.com', role: 'ADMIN' } }); });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Creá tu cuenta de profesor.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Registrarme como profesor' }).click();
+  await expect(page.getByRole('heading', { name: 'Mis cursos.' })).toBeVisible();
+});
+test('teacher downloads attendance for Excel', async ({ page }) => {
+  await auth(page); await backend(page); await page.goto('/sesiones/' + sessionId);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Descargar para Excel (CSV)' }).click();
+  expect((await download).suggestedFilename()).toBe('asistencias-' + sessionId + '.csv');
+});
+
+test('student supplies academic identity before attendance and reuses it next class', async ({ page }) => {
+  await auth(page); await backend(page, 'STUDENT'); let saved = false; let confirmations = 0;
+  const profile = () => ({ id: userId, email: 'lucas@example.com', role: 'STUDENT', name: saved ? 'Juan Pérez' : 'Google Alias', academic_first_name: saved ? 'Juan' : null, academic_last_name: saved ? 'Pérez' : null });
+  await page.route('**/me', route => route.fulfill({ json: profile() }));
+  await page.route('**/me/academic-profile', route => {
+    expect(route.request().postDataJSON()).toEqual({ firstName: 'Juan', lastName: 'Pérez' });
+    saved = true; return route.fulfill({ json: profile() });
+  });
+  page.on('request', r => { if (r.url().endsWith('/check-in/confirm')) confirmations++; });
+  await page.goto('/a/first-academic-qr');
+  await expect(page.getByRole('heading', { name: 'Tu nombre en la universidad.' })).toBeVisible();
+  expect(confirmations).toBe(0);
+  await page.getByLabel('Nombre', { exact: true }).fill('Juan'); await page.getByLabel('Apellido', { exact: true }).fill('Pérez');
+  await page.getByRole('button', { name: 'Guardar y registrar presente' }).click();
+  await expect(page.getByRole('heading', { name: '¡Presente!' })).toBeVisible();
+  await expect(page.getByText('Juan Pérez', { exact: true })).toBeVisible(); expect(confirmations).toBe(1);
+  await page.goto('/a/next-academic-qr'); await expect(page.getByRole('heading', { name: '¡Presente!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tu nombre en la universidad.' })).toHaveCount(0);
 });

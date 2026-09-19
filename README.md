@@ -11,7 +11,7 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-Abrir `http://localhost:5173`. El backend debe estar en ejecución, con migraciones aplicadas y un profesor habilitado como ADMIN. Ver `../asistencia_universitaria.v1/README.md` para preparar Supabase.
+Abrir `http://localhost:5173`. El backend debe estar en ejecución, con migraciones aplicadas y una cuenta de Google verificada. Ver `../asistencia_universitaria.v1/README.md` para preparar Supabase.
 
 Variables:
 
@@ -63,10 +63,18 @@ Las pruebas Playwright usan Chrome instalado y una API/Supabase simulados: no re
 
 Capturas locales en `test-results/`: escritorio, proyección de clase y alumno móvil. Los artefactos de pruebas y credenciales están excluidos de Git.
 
-Estas pruebas no reemplazan la prueba final con Google y el backend real. Para esa prueba hace falta completar las variables, migrar la base y habilitar al profesor.
+Estas pruebas no reemplazan la prueba final con Google y el backend real. Para esa prueba hace falta completar las variables, migrar la base y completar el registro docente.
 
 ## Vercel
 
 Importar el repositorio y seleccionar **Root Directory: `asistencia_universitaria`**. Framework Vite, build `npm run build`, output `dist`. Cargar las tres variables públicas y volver a construir cuando cambien. `vercel.json` incluye las rutas SPA para QR y OAuth y headers básicos. Registrar el dominio final en Supabase y en el CORS del backend.
 
 El proyecto queda preparado para desplegar; este trabajo no crea un despliegue ni configura credenciales reales. Sin variables configuradas se muestra el acceso deshabilitado, sin datos de demostración ni simulaciones de asistencia.
+
+## Registro y descarga
+
+Al ingresar por primera vez, confirmar «Registrarme como profesor». La cuenta accede a Mis cursos, desde donde puede crear un curso y entrar a preparar cada clase (nombre y duración). Al generar el QR empieza la asistencia. El historial permite agregar presentes manualmente, anular registros y descargar el listado completo como CSV UTF-8 compatible con Excel, incluyendo los anulados y sus motivos.
+
+## Nombre académico del alumno
+
+Antes del primer presente se consulta `/me`. Si faltan los datos académicos, se solicitan nombre y apellido como aparecen en la universidad y se guardan en `/me/academic-profile`. No se autocompletan desde Google. Se reutilizan en futuros ingresos, listados y CSV. El correo personal sigue siendo el de la cuenta autenticada; no se requiere que coincida con el correo institucional. El formulario no verifica contra un padrón. Si vence el intento durante la carga, los datos quedan guardados, pero se debe escanear nuevamente. Requiere la migración backend `002_academic_name.sql`.

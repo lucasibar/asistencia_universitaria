@@ -1,4 +1,4 @@
-export interface Profile { id: string; name: string; email: string; role: 'ADMIN' | 'STUDENT' }
+export interface Profile { id: string; name: string; email: string; role: 'ADMIN' | 'STUDENT'; academic_first_name?: string | null; academic_last_name?: string | null }
 export interface Course { id: string; name: string; class_count: number; archived_at: string | null; created_at: string }
 export interface ClassItem { id: string; name: string; class_date: string; archived_at: string | null; session_id: string; session_status: string; present_count: number }
 export interface AttendanceSession {

@@ -10,6 +10,7 @@ export class ApiError extends Error {
   constructor(public code: string, public status = 0) { super(code); }
 }
 const messages: Record<string, string> = {
+  ACADEMIC_PROFILE_REQUIRED: 'El alumno debe completar su nombre y apellido como figuran en la universidad antes de registrar asistencia.',
   QR_EXPIRED: 'Este código expiró. Escaneá el QR que está en pantalla.',
   INVALID_QR: 'Este código no es válido. Escaneá el QR de la clase.',
   SESSION_CLOSED: 'La asistencia está cerrada.', SESSION_CANCELLED: 'Esta clase ya no está disponible.',
